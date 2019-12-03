@@ -59,7 +59,9 @@ def close_logfile():
     try:
         new_log.close()
         os.rename(new_log.name,
-                  "data/candump-{}.log".format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ", "_").replace(":", ""))
+                  "data/candump-{}.log".format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ",
+                                                                                                           "_").replace(
+                      ":", ""))
     except IOError:
         pass
 
@@ -75,7 +77,6 @@ def print_statistics():
 with open(inputFile) as inf:
     canIds = {}
     nodeIds = {}
-    lastTime = 0
     dataUtcStr = None
     dataDateStr = None
     ts_log_last = None
@@ -83,61 +84,59 @@ with open(inputFile) as inf:
     log_file_nr = 0
     new_log = None
     diff = None
+    ts_log_diff = None
     mmm = []
 
     for cnt, line in enumerate(inf):
-        diff = 0
-        if new_log == None:
+        if new_log is None:
             log_file_nr = log_file_nr + 1
             new_log = open("data/newlog_{}.log".format(log_file_nr), "w+")
         if not check(line):
             print("ERROR, line={:d} {:s}".format(cnt, line))
         else:
             ts, canDevStr, canIdStr, dataStr, nodeIdStr = getCanDate(line)
-            if ts_log_first == None: ts_log_first = ts
             canId = int(canIdStr, 16)
 
             if canId == 0x1FFFFFF0:  # Time sync
-                # (1566638861.000000) can0 1FFFFFF0#1308180B1B29
-                #   0.00000 1  536870896x Tx D 6  19   8  24  11  27  41
                 ts_log = datetime.datetime((int(line[34:36], 16) + 2000),
                                            int(line[37:38], 16),
                                            int(line[38:40], 16),
                                            int(line[40:42], 16),
                                            int(line[42:44], 16),
                                            int(line[44:46], 16)).timestamp()
-                if ts_log_last == None: ts_log_last = ts_log
-                diff = ts_log - ts_log_last
-                # print("Syn", datetime.datetime.fromtimestamp(ts_log), "/", ts_log - ts, "/", diff)
-                ## if diff > 1.0: print("Syn diff > 1.0", diff)
+                diff = ts_log - ts
+                if ts_log_last is None:
+                    ts_log_last = ts_log
+                ts_log_diff = ts_log - ts_log_last
                 ts_log_last = ts_log
+                if ts_log_first is None:
+                    ts_log_first = ts_log
                 line = None
 
             elif canId == 1200:  # UTC)
-                if not dataDateStr == None:
+                if not dataDateStr is None:
                     ts_gps = datetime.datetime((int(dataDateStr[4:6], 16) * 100) + int(dataDateStr[6:8], 16),
                                                int(dataDateStr[2:4], 16),
                                                int(dataDateStr[0:2], 16), int(dataStr[0:2], 16), int(dataStr[2:4], 16),
                                                int(dataStr[4:6], 16)).timestamp()
-                    # print("Gps", datetime.datetime.fromtimestamp(ts), "/", datetime.datetime.fromtimestamp(ts_gps), "/",
-                    #       ts_gps - ts)
                 mmm.append(ts_gps - ts)
                 dataUtcStr = dataStr
 
             elif canId == 1206:
                 dataDateStr = dataStr
 
-        if line != None: new_log.write(line)
+            if line is not None:
+                parts = (" ".join(line.split()).split())
+                new_log.write("({:f}) {} {}\n".format(ts + diff, parts[1], parts[2]))
 
-        if diff > 3600 * 5:
-            close_logfile()
-            new_log = None
-            ts_log_first = None
-            print_statistics()
+            if not ts_log_first is None and ts_log_diff > 1.0:
+                close_logfile()
+                new_log = None
+                ts_log_first = None
+                print_statistics()
 
-        statistics(canIds, canId)
-        statistics(nodeIds, int(nodeIdStr, 16))
-        lastTime = ts
+            statistics(canIds, canId)
+            statistics(nodeIds, int(nodeIdStr, 16))
 
     close_logfile()
     print_statistics()
