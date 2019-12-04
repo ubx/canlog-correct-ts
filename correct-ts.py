@@ -54,12 +54,12 @@ def check(line):
 
 
 def close_logfile():
-    global new_log
+    global new_log, new_log_file_name
     try:
         new_log.close()
-        os.rename(new_log.name,
-                  "data/candump-{}.log".
-                  format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ", "_").replace(":", ""))
+        new_log_file_name = "data/candump-{}.log". \
+            format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ", "_").replace(":", "")
+        os.rename(new_log.name, new_log_file_name)
     except IOError:
         pass
 
@@ -67,7 +67,7 @@ def close_logfile():
 def print_gps_diff_statistics():
     global mmm
     m = mean(mmm)
-    print("Cnt=", new_cnt, "mean=", m, "variance=", variance(mmm, m), "stdev=", stdev(mmm, m),
+    print(new_log_file_name, " cnt=", new_cnt, "mean=", m, "variance=", variance(mmm, m), "stdev=", stdev(mmm, m),
           "max=", max(mmm), "min=", min(mmm))
     mmm = []
 
@@ -81,6 +81,7 @@ with open(inputFile) as inf:
     ts_log_first = None
     log_file_nr = 0
     new_log = None
+    new_log_file_name = None
     diff = None
     ts_log_diff = None
     mmm = []
@@ -128,9 +129,9 @@ with open(inputFile) as inf:
 
             if not ts_log_first is None and ts_log_diff > 1.0:
                 close_logfile()
+                print_gps_diff_statistics()
                 new_log = None
                 ts_log_first = None
-                print_gps_diff_statistics()
 
             statistics(canIds, canId)
             statistics(nodeIds, int(nodeIdStr, 16))
