@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import datetime
 import os
@@ -59,17 +58,16 @@ def close_logfile():
     try:
         new_log.close()
         os.rename(new_log.name,
-                  "data/candump-{}.log".format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ",
-                                                                                                           "_").replace(
-                      ":", ""))
+                  "data/candump-{}.log".
+                  format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ", "_").replace(":", ""))
     except IOError:
         pass
 
 
-def print_statistics():
+def print_gps_diff_statistics():
     global mmm
     m = mean(mmm)
-    print("Mean diff ts_gps-ts =", m, "variance=", variance(mmm, m), "stdev=", stdev(mmm, m),
+    print("Cnt=", new_cnt, "mean=", m, "variance=", variance(mmm, m), "stdev=", stdev(mmm, m),
           "max=", max(mmm), "min=", min(mmm))
     mmm = []
 
@@ -86,6 +84,7 @@ with open(inputFile) as inf:
     diff = None
     ts_log_diff = None
     mmm = []
+    new_cnt = 0
 
     for cnt, line in enumerate(inf):
         if new_log is None:
@@ -98,12 +97,9 @@ with open(inputFile) as inf:
             canId = int(canIdStr, 16)
 
             if canId == 0x1FFFFFF0:  # Time sync
-                ts_log = datetime.datetime((int(line[34:36], 16) + 2000),
-                                           int(line[37:38], 16),
-                                           int(line[38:40], 16),
-                                           int(line[40:42], 16),
-                                           int(line[42:44], 16),
-                                           int(line[44:46], 16)).timestamp()
+                ts_log = datetime.datetime((int(line[34:36], 16) + 2000), int(line[37:38], 16),
+                                           int(line[38:40], 16), int(line[40:42], 16),
+                                           int(line[42:44], 16), int(line[44:46], 16)).timestamp()
                 diff = ts_log - ts
                 if ts_log_last is None:
                     ts_log_last = ts_log
@@ -119,7 +115,7 @@ with open(inputFile) as inf:
                                                int(dataDateStr[2:4], 16),
                                                int(dataDateStr[0:2], 16), int(dataStr[0:2], 16), int(dataStr[2:4], 16),
                                                int(dataStr[4:6], 16)).timestamp()
-                mmm.append(ts_gps - ts)
+                    mmm.append((ts + diff) - ts_gps)
                 dataUtcStr = dataStr
 
             elif canId == 1206:
@@ -128,18 +124,19 @@ with open(inputFile) as inf:
             if line is not None:
                 parts = (" ".join(line.split()).split())
                 new_log.write("({:f}) {} {}\n".format(ts + diff, parts[1], parts[2]))
+                new_cnt = new_cnt + 1
 
             if not ts_log_first is None and ts_log_diff > 1.0:
                 close_logfile()
                 new_log = None
                 ts_log_first = None
-                print_statistics()
+                print_gps_diff_statistics()
 
             statistics(canIds, canId)
             statistics(nodeIds, int(nodeIdStr, 16))
 
     close_logfile()
-    print_statistics()
+    print_gps_diff_statistics()
 
 print("canId statistics")
 print(sorted(canIds.items(), key=lambda kv: kv[0], reverse=True))
