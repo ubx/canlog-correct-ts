@@ -10,7 +10,9 @@ import argparse
 from datetime import datetime
 
 import can
-from can import Bus, LogReader, MessageSync
+from can import Bus, LogReader
+
+from MessageSyncPart import MessageSyncPart
 
 
 def main():
@@ -130,9 +132,8 @@ def main():
 
     reader = LogReader(results.infile)
 
-    in_sync = MessageSync(
-        reader, timestamps=results.timestamps, gap=results.gap, skip=results.skip
-    )
+    in_sync = MessageSyncPart(
+        reader, timestamps=results.timestamps, gap=results.gap, skip=results.skip, start=4711.0)
 
     print(f"Can LogReader (Started on {datetime.now()})")
 
