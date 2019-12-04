@@ -9,6 +9,8 @@ from statistics import mean, variance, stdev
       sudo ip link set up vcan0
 '''
 
+## todo -- user rather Log Reader then our  complicated parsing code !!!
+
 parser = argparse.ArgumentParser(description='Correct time stamps according the GPS time (UTC)')
 parser.add_argument('-input', metavar='input', type=str, help='Input logfile')
 args = parser.parse_args()
