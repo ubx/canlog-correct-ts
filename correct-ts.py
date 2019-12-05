@@ -11,11 +11,15 @@ from statistics import mean, variance, stdev
 
 ## todo -- user rather Log Reader then our  complicated parsing code !!!
 
-parser = argparse.ArgumentParser(description='Correct time stamps according the GPS time (UTC)')
+parser = argparse.ArgumentParser(
+    description='Correct time stamps according to the logger time synch (canId 0x1FFFFFF0) and optional GPS time (UTC).')
 parser.add_argument('-input', metavar='input', type=str, help='Input logfile')
+parser.add_argument('-gps', action='store_true', help='Sync with GPS time (canIDs 1200 and 1206.')
+
 args = parser.parse_args()
 
 inputFile = args.input
+syngps = args.gps
 
 
 # (1564994147.496590) can0 78A#0A0C1CE5F7990000
@@ -71,7 +75,16 @@ def print_gps_diff_statistics():
     m = mean(mmm)
     print(new_log_file_name, " cnt=", new_cnt, "mean=", m, "variance=", variance(mmm, m), "stdev=", stdev(mmm, m),
           "max=", max(mmm), "min=", min(mmm))
-    mmm = []
+
+
+def sync_with_gps(log_file_name: str, diff):
+    log_file_name_gps = log_file_name.replace(".log", "-gps.log")
+    with open(log_file_name_gps, "w") as lf_gps:
+        with open(log_file_name) as lf:
+            for _, line in enumerate(lf):
+                ts, channel, frame = line.strip().split()
+                ts = float(ts[1:-1])
+                lf_gps.write("({:f}) {} {}\n".format(ts - diff, channel, frame))
 
 
 with open(inputFile) as inf:
@@ -132,6 +145,9 @@ with open(inputFile) as inf:
             if not ts_log_first is None and ts_log_diff > 1.0:
                 close_logfile()
                 print_gps_diff_statistics()
+                if syngps:
+                    sync_with_gps(new_log_file_name, mean(mmm))
+                mmm = []
                 new_log = None
                 ts_log_first = None
 
@@ -140,6 +156,8 @@ with open(inputFile) as inf:
 
     close_logfile()
     print_gps_diff_statistics()
+    if syngps:
+        sync_with_gps(new_log_file_name, mean(mmm))
 
 print("canId statistics")
 print(sorted(canIds.items(), key=lambda kv: kv[0], reverse=True))
