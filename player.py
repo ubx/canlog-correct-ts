@@ -10,9 +10,9 @@ import argparse
 from datetime import datetime
 
 import can
-from can import Bus, LogReader
+from can import Bus, LogReader, MessageSync
 
-from MessageSyncPart import MessageSyncPart
+from player2 import MessageSync2
 
 
 def main():
@@ -95,6 +95,13 @@ def main():
     )
 
     parser.add_argument(
+        "--start",
+        type=float,
+        default=None,
+        help="""start on frames with time < timestamp""",
+    )
+
+    parser.add_argument(
         "infile",
         metavar="input-file",
         type=str,
@@ -112,9 +119,7 @@ def main():
 
     verbosity = results.verbosity
 
-    logging_level_name = ["critical", "error", "warning", "info", "debug", "subdebug"][
-        min(5, verbosity)
-    ]
+    logging_level_name = ["critical", "error", "warning", "info", "debug", "subdebug"][min(5, verbosity)]
     can.set_logging_level(logging_level_name)
 
     error_frames = results.error_frames
@@ -132,8 +137,7 @@ def main():
 
     reader = LogReader(results.infile)
 
-    in_sync = MessageSyncPart(
-        reader, timestamps=results.timestamps, gap=results.gap, skip=results.skip, start=4711.0)
+    in_sync = MessageSync2(reader, timestamps=results.timestamps, gap=results.gap, skip=results.skip, start=results.start)
 
     print(f"Can LogReader (Started on {datetime.now()})")
 

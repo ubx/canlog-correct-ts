@@ -19,7 +19,7 @@ parser.add_argument('-gps', action='store_true', help='Sync with GPS time (canID
 args = parser.parse_args()
 
 inputFile = args.input
-syngps = args.gps
+syncwithgps = args.gps
 
 
 # (1564994147.496590) can0 78A#0A0C1CE5F7990000
@@ -79,12 +79,11 @@ def print_gps_diff_statistics():
 
 def sync_with_gps(log_file_name: str, diff):
     log_file_name_gps = log_file_name.replace(".log", "-gps.log")
-    with open(log_file_name_gps, "w") as lf_gps:
-        with open(log_file_name) as lf:
-            for _, line in enumerate(lf):
-                ts, channel, frame = line.strip().split()
-                ts = float(ts[1:-1])
-                lf_gps.write("({:f}) {} {}\n".format(ts - diff, channel, frame))
+    with open(log_file_name_gps, "w") as lf_gps, open(log_file_name) as lf:
+        for _, line in enumerate(lf):
+            ts, channel, frame = line.strip().split()
+            ts = float(ts[1:-1])
+            lf_gps.write("({:f}) {} {}\n".format(ts - diff, channel, frame))
 
 
 with open(inputFile) as inf:
@@ -145,7 +144,7 @@ with open(inputFile) as inf:
             if not ts_log_first is None and ts_log_diff > 1.0:
                 close_logfile()
                 print_gps_diff_statistics()
-                if syngps:
+                if syncwithgps:
                     sync_with_gps(new_log_file_name, mean(mmm))
                 mmm = []
                 new_log = None
@@ -156,7 +155,7 @@ with open(inputFile) as inf:
 
     close_logfile()
     print_gps_diff_statistics()
-    if syngps:
+    if syncwithgps:
         sync_with_gps(new_log_file_name, mean(mmm))
 
 print("canId statistics")
