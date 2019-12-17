@@ -69,6 +69,7 @@ def main():
     conn.commit()
 
     messages = []
+    m = 0
     try:
         for msg in in_nosync:
             if verbosity >= 3:
@@ -81,10 +82,11 @@ def main():
                 msg.is_error_frame,
                 msg.dlc,
                 memoryview(msg.data)))
-            if len(messages) > 100_000:
+            if len(messages) >= 100_000:
                 my_logger(conn, messages)
+                m += len(messages)
+                print('Commits', m)
                 messages = []
-                print(".....")
 
     except KeyboardInterrupt:
         pass
