@@ -2,7 +2,9 @@
 # coding: utf-8
 
 """
-Import a  can-bus logfile into sqlite3 db.
+Import a can-bus logfile into sqlite3 db.
+Note: don't forget to add an index to ts field:
+   sqlite3 -line log-data.db 'CREATE unique INDEX ts_idx ON messages (ts);'
 """
 
 from __future__ import absolute_import, print_function

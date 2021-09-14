@@ -12,7 +12,7 @@ from statistics import mean, variance, stdev
 ## todo -- user rather Log Reader then our  complicated parsing code !!!
 
 parser = argparse.ArgumentParser(
-    description='Correct time stamps according to the logger time synch (canId 0x1FFFFFF0) and optional GPS time (UTC).'
+    description='Correct time stamps according to the logger time sync (canId 0x1FFFFFF0) and optional GPS time (UTC).'
                 'Only useful for CANaerospace format!')
 parser.add_argument('-input', metavar='input', type=str, help='Input logfile.')
 parser.add_argument('-gps', action='store_true', help='Sync with GPS time (canIDs 1200 and 1206.')
@@ -24,7 +24,7 @@ syncwithgps = args.gps
 
 
 # (1564994147.496590) can0 78A#0A0C1CE5F7990000
-def getCanDate(line):
+def getCanData(line):
     parts = (" ".join(line.split()).split())
     ts = float(parts[0][1:18])
     canDevStr = parts[1]
@@ -114,7 +114,7 @@ with open(inputFile) as inf:
         if not check(line):
             print("ERROR, line={:d} >>>{:s}<<< \n".format(cnt, line))
         else:
-            ts, canDevStr, canIdStr, dataStr, nodeIdStr = getCanDate(line)
+            ts, canDevStr, canIdStr, dataStr, nodeIdStr = getCanData(line)
             diff = 0.0
             canId = int(canIdStr, 16)
             if ts_first is None:
@@ -133,7 +133,7 @@ with open(inputFile) as inf:
                     ts_log_first = ts_log
                 line = None
 
-            elif canId == 1200:  # UTC)
+            elif canId == 1200:  # UTC
                 if not dataDateStr is None:
                     ts_gps = datetime.datetime((int(dataDateStr[4:6], 16) * 100) + int(dataDateStr[6:8], 16),
                                                int(dataDateStr[2:4], 16),
@@ -144,7 +144,7 @@ with open(inputFile) as inf:
                     mmm.append((ts + diff) - ts_gps)
                 dataUtcStr = dataStr
 
-            elif canId == 1206:
+            elif canId == 1206: # Date
                 dataDateStr = dataStr
 
             if line is not None:
@@ -152,7 +152,7 @@ with open(inputFile) as inf:
                 new_log.write("({:f}) {} {}\n".format(ts + diff, parts[1], parts[2]))
                 new_cnt = new_cnt + 1
 
-            if not ts_log_first is None and ts_log_diff > 1.0:
+            if ts_log_first is not None and ts_log_diff > 1.0:
                 close_logfile(ts_log_first)
                 print_gps_diff_statistics()
                 if syncwithgps:
