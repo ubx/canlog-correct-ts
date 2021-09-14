@@ -4,7 +4,7 @@ import os
 from statistics import mean, variance, stdev
 
 '''
-   Adjust time stamps according to to GPS time (UTC):
+   Adjust timestamps of a CAN dump file according to GPS time (UTC).
       sudo ip link add dev vcan0 type vcan
       sudo ip link set up vcan0
 '''
