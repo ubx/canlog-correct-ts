@@ -12,8 +12,9 @@ from statistics import mean, variance, stdev
 ## todo -- user rather Log Reader then our  complicated parsing code !!!
 
 parser = argparse.ArgumentParser(
-    description='Correct time stamps according to the logger time synch (canId 0x1FFFFFF0) and optional GPS time (UTC).')
-parser.add_argument('-input', metavar='input', type=str, help='Input logfile')
+    description='Correct time stamps according to the logger time synch (canId 0x1FFFFFF0) and optional GPS time (UTC).'
+                'Only useful for CANaerospace format!')
+parser.add_argument('-input', metavar='input', type=str, help='Input logfile.')
 parser.add_argument('-gps', action='store_true', help='Sync with GPS time (canIDs 1200 and 1206.')
 
 args = parser.parse_args()
@@ -44,27 +45,29 @@ def statistics(ids, id):
 ## "(1564994154.769054) can0 40C#0A032A3A1BC27A49"
 ## "(1569437515.1000000) can0 141#0A0200A942E1CBEA" --> ERROR
 def check(line):
-    if not line.startswith("("):
-        return False
-    for c in line[1:11]:
-        if not c.isdigit():
+    try:
+        if not line.startswith("("):
             return False
-    if line[11] != '.':
-        return False
-    for c in line[12:18]:
-        if not c.isdigit():
+        for c in line[1:11]:
+            if not c.isdigit():
+                return False
+        if line[11] != '.':
             return False
-    if line[18] != ')':
+        for c in line[12:18]:
+            if not c.isdigit():
+                return False
+        if line[18] != ')':
+            return False
+        return True
+    except (IndexError):
         return False
-    return True
 
-
-def close_logfile():
+def close_logfile(ts_log):
     global new_log, new_log_file_name
     try:
         new_log.close()
         new_log_file_name = "data/candump-{}.log". \
-            format(datetime.datetime.fromtimestamp(int(ts_log_first))).replace(" ", "_").replace(":", "")
+            format(datetime.datetime.fromtimestamp(int(ts_log))).replace(" ", "_").replace(":", "")
         os.rename(new_log.name, new_log_file_name)
     except IOError:
         pass
@@ -100,16 +103,22 @@ with open(inputFile) as inf:
     ts_log_diff = None
     mmm = []
     new_cnt = 0
+    ts_first = None
+    ts_gps_first = None
+
 
     for cnt, line in enumerate(inf):
         if new_log is None:
             log_file_nr = log_file_nr + 1
             new_log = open("data/newlog_{}.log".format(log_file_nr), "w+")
         if not check(line):
-            print("ERROR, line={:d} {:s}".format(cnt, line))
+            print("ERROR, line={:d} >>>{:s}<<< \n".format(cnt, line))
         else:
             ts, canDevStr, canIdStr, dataStr, nodeIdStr = getCanDate(line)
+            diff = 0.0
             canId = int(canIdStr, 16)
+            if ts_first is None:
+                ts_first = ts
 
             if canId == 0x1FFFFFF0:  # Time sync
                 ts_log = datetime.datetime((int(line[34:36], 16) + 2000), int(line[37:38], 16),
@@ -130,6 +139,8 @@ with open(inputFile) as inf:
                                                int(dataDateStr[2:4], 16),
                                                int(dataDateStr[0:2], 16), int(dataStr[0:2], 16), int(dataStr[2:4], 16),
                                                int(dataStr[4:6], 16)).timestamp()
+                    if ts_gps_first is None:
+                        ts_gps_first = ts_gps
                     mmm.append((ts + diff) - ts_gps)
                 dataUtcStr = dataStr
 
@@ -142,7 +153,7 @@ with open(inputFile) as inf:
                 new_cnt = new_cnt + 1
 
             if not ts_log_first is None and ts_log_diff > 1.0:
-                close_logfile()
+                close_logfile(ts_log_first)
                 print_gps_diff_statistics()
                 if syncwithgps:
                     sync_with_gps(new_log_file_name, mean(mmm))
@@ -153,7 +164,10 @@ with open(inputFile) as inf:
             statistics(canIds, canId)
             statistics(nodeIds, int(nodeIdStr, 16))
 
-    close_logfile()
+    if ts_log_first is None:
+        ts_log_first = ts_gps_first
+
+    close_logfile(ts_log_first)
     print_gps_diff_statistics()
     if syncwithgps:
         sync_with_gps(new_log_file_name, mean(mmm))

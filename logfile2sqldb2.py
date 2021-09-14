@@ -2,8 +2,7 @@
 # coding: utf-8
 
 """
-Converts can.logger to sql sqlite3 db.
-
+Import a  can-bus logfile into sqlite3 db.
 """
 
 from __future__ import absolute_import, print_function
@@ -25,7 +24,7 @@ def my_logger(conn, messages):
 def main():
     parser = argparse.ArgumentParser(
         "python logfile2sql",
-        description="Writes can log file into sql sqlite3 db.")
+        description="Import can-bus logfile into sqlite3 db.")
 
     parser.add_argument('infile', metavar='input-file', type=str,
                         help='The file to read. For supported types see can.LogReader.')

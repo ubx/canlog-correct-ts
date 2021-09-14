@@ -9,12 +9,12 @@ from __future__ import absolute_import, print_function
 import argparse
 import sys
 from datetime import datetime
+from threading import Thread
 
 import can
 from can import Bus, MessageSync
 
 from player2 import LogReader2
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -136,11 +136,15 @@ def main():
         config["data_bitrate"] = results.data_bitrate
     bus = Bus(results.channel, **config)
 
+    ##sendMessages(error_frames, results, verbosity, bus)
+    th = Thread(target=sendMessages, args=(error_frames, results, verbosity, bus))
+    th.start()
+
+
+def sendMessages(error_frames, results, verbosity, bus):
     reader = LogReader2(results.infile, results.start_time)
     in_sync = MessageSync(reader, timestamps=results.timestamps, gap=results.gap, skip=results.skip)
-
     print('Can LogReader (Started on {})'.format(datetime.now()))
-
     try:
         for message in in_sync:
             if message.is_error_frame and not error_frames:
