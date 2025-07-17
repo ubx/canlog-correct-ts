@@ -78,7 +78,8 @@ def main():
         "--error-frames",
         help="Also send error frames to the interface.",
         action="store_true",
-    )
+    )    # This works because InputDevice has a `fileno()` method.
+
 
     parser.add_argument(
         "-g",
@@ -147,6 +148,9 @@ def main():
                 continue
             if verbosity >= 3:
                 print(message)
+            if message.arbitration_id == 1510:
+                import binascii
+                print(binascii.hexlify(bytearray(message.data[:message.dlc])))
             bus.send(message)
     except KeyboardInterrupt:
         pass

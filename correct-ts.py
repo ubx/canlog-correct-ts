@@ -104,6 +104,7 @@ with open(inputFile) as inf:
     mmm = []
     new_cnt = 0
     ts_first = None
+    ts_prev = None
     ts_gps_first = None
 
 
@@ -119,6 +120,12 @@ with open(inputFile) as inf:
             canId = int(canIdStr, 16)
             if ts_first is None:
                 ts_first = ts
+            if ts_prev is None:
+                ts_prev = ts
+            else:
+                if ts - ts_prev > 1.0:
+                    print("ERROR, gap between ts {:f} and {:f} \n".format(ts_prev, ts))
+                ts_prev = ts
 
             if canId == 0x1FFFFFF0:  # Time sync
                 ts_log = datetime.datetime((int(line[34:36], 16) + 2000), int(line[37:38], 16),
