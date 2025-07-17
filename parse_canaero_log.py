@@ -2,7 +2,7 @@ import csv
 import re
 import argparse
 import struct
-import datetime
+from datetime import datetime, timezone
 
 # Mapping of CAN ID to parameter name and unit
 canid_info = {
@@ -100,7 +100,7 @@ def parse_line(line, raw_mode=False):
 
     ts_raw, rest = line.strip().split(') ')
     timestamp = float(ts_raw[1:])
-    time_str = datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    time_str = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec='milliseconds')
     can_id = int(match.group(2), 16)
     raw_data_hex = match.group(3)
 
