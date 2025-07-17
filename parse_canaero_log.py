@@ -2,6 +2,7 @@ import csv
 import re
 import argparse
 import struct
+import datetime
 
 # Mapping of CAN ID to parameter name and unit
 canid_info = {
@@ -29,7 +30,7 @@ canid_info = {
     0x40D: ("GPS aircraft_lon", "deg"),
     0x500: ("Reserved_1", "N/A"),
     0x501: ("Reserved_2", "N/A"),
-}
+} ## add more ...
 
 # Mapping of data type code to (struct format, byte length, name)
 DATA_TYPE_INFO = {
@@ -97,7 +98,9 @@ def parse_line(line, raw_mode=False):
     if not match:
         return None
 
-    timestamp = float(match.group(1))
+    ts_raw, rest = line.strip().split(') ')
+    timestamp = float(ts_raw[1:])
+    time_str = datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     can_id = int(match.group(2), 16)
     raw_data_hex = match.group(3)
 
@@ -116,7 +119,7 @@ def parse_line(line, raw_mode=False):
     param_name, unit = canid_info.get(can_id, ("Unknown", ""))
 
     return {
-        "timestamp": timestamp,
+        "timestamp": time_str,
         "can_id": f"0x{can_id:X}",
         "can_id descr": param_name,
         "unit": unit,
