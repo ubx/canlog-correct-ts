@@ -249,7 +249,7 @@ def parse_log_file(input_path, output_path, filter_can_id=None, raw_mode=False):
         for line in inf:
             parsed = parse_line(line, raw_mode=raw_mode)
             if parsed:
-                if filter_can_id and f"0x{filter_can_id:X}" != parsed["can_id"]:
+                if filter_can_id and f"0x{filter_can_id:X}" != parsed["can_id"].split()[0]:
                     continue
                 writer.writerow(parsed)
 
