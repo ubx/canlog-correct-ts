@@ -3,9 +3,13 @@ import csv
 import re
 import struct
 from datetime import datetime, timezone
+from typing import Dict, Tuple, Union, Optional, Any
+
+# Pre-compile regex for better performance
+CAN_LINE_PATTERN = re.compile(r"\(([\d.]+)\)\s+can\d+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)")
 
 # Mapping of CAN ID to parameter name and unit
-canid_info = {
+CANID_INFO = {
     # --- Flight Dynamics (0x12C-0x15C) ---
     0x12C: ("Body Longitudinal Acceleration", "m/s²"),
     0x12D: ("Body Lateral Acceleration", "m/s²"),
@@ -69,7 +73,6 @@ canid_info = {
     0x19D: ("Nose Wheel Steering Handle Position", "deg"),
     0x19E: ("Engine 1 Throttle Lever Position Ecs Channel A", "%"),
     0x19F: ("Engine 2 Throttle Lever Position Ecs Channel A", "%"),
-    # ... (all engine throttle/condition lever positions in hex) ...
     0x1AE: ("Flaps Lever Position", "deg"),
     0x1AF: ("Slats Lever Position", "deg"),
     0x1B0: ("Park Brake Lever Position", "enum"),
@@ -87,10 +90,8 @@ canid_info = {
     # --- Propulsion/Engine (0x1F4-0x2BB) ---
     0x1F4: ("Engine 1 N1 Ecs Channel A", "%"),
     0x1F5: ("Engine 2 N1 Ecs Channel A", "%"),
-    # ... (all engine parameters in hex) ...
     0x294: ("Fuel Pump 1 Flow Rate", "L/h"),
     0x295: ("Fuel Pump 2 Flow Rate", "L/h"),
-    # ... (all fuel system parameters) ...
 
     # --- Navigation/GPS (0x3E8-0x44F) ---
     0x3E8: ("Active Nav System Waypoint Latitude", "deg"),
@@ -122,7 +123,6 @@ canid_info = {
     # --- Electrical/Hydraulic (0x320-0x3CF) ---
     0x320: ("Hydraulic System 1 Pressure", "kPa"),
     0x321: ("Hydraulic System 2 Pressure", "kPa"),
-    # ... (all hydraulic/electrical parameters) ...
 
     # --- Time/Miscellaneous (0x4B0-0x4B6) ---
     0x4B0: ("Utc", "timestamp"),
@@ -136,7 +136,7 @@ canid_info = {
 
 # Mapping of data type code to (struct format, byte length, name)
 DATA_TYPE_INFO = {
-    0x00: ('>f', 0, 'NODATA'),  # No data (size 0)
+    0x00: (None, 0, 'NODATA'),  # No data (size 0)
     0x01: ('>I', 4, 'ERROR'),  # Error code
     0x02: ('>f', 4, 'FLOAT'),  # IEEE 754 single-precision floats
     0x03: ('>i', 4, 'LONG'),  # 32-bit signed integer
@@ -169,47 +169,55 @@ DATA_TYPE_INFO = {
     0x1E: ('>d', 8, 'DOUBLEH'),  # Double-precision float
     0x1F: ('<d', 8, 'DOUBLEL'),  # Double-precision float
 }
-for type_id in range(0x20, 0x63):
-    DATA_TYPE_INFO[type_id] = ('>x', 4, 'RESVD')
-for type_id in range(0x64, 0xFF):
-    DATA_TYPE_INFO[type_id] = ('>x', 4, 'UDEF')
+
+# Fill reserved and undefined ranges
+DATA_TYPE_INFO.update({type_id: ('>x', 4, 'RESVD') for type_id in range(0x20, 0x63)})
+DATA_TYPE_INFO.update({type_id: ('>x', 4, 'UDEF') for type_id in range(0x64, 0xFF)})
 
 
-def decode_data_by_type(raw_bytes, data_type_code, raw_mode=False):
-    info = DATA_TYPE_INFO.get(data_type_code)
-    if not info or raw_mode:
+def decode_data_by_type(raw_bytes: bytes, data_type_code: int, raw_mode: bool = False) -> Tuple[
+    Union[str, float, int], str]:
+    """Decode raw bytes according to data type code."""
+    if raw_mode:
         return raw_bytes.hex().upper(), f'raw_0x{data_type_code:02X}'
+
+    info = DATA_TYPE_INFO.get(data_type_code)
+    if not info:
+        return raw_bytes.hex().upper(), f'unknown_0x{data_type_code:02X}'
 
     fmt, num_bytes, data_type = info
     data_slice = raw_bytes[:num_bytes]
 
     try:
-        if fmt:
-            unpacked = struct.unpack(fmt, data_slice)
-            if len(unpacked) > 1:
-                return ','.join(str(x) for x in unpacked), data_type
-            else:
-                return unpacked[0], data_type
-        else:
+        if not fmt:
             return data_slice.hex().upper(), data_type
+
+        unpacked = struct.unpack(fmt, data_slice)
+        if len(unpacked) > 1:
+            return ','.join(map(str, unpacked)), data_type
+        return unpacked[0], data_type
     except Exception:
         return data_slice.hex().upper(), f'decode_error_{data_type}'
 
 
-def parse_line(line, raw_mode=False):
-    match = re.match(r"\(([\d.]+)\)\s+can\d+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)", line)
+def parse_line(line: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
+    """Parse a single line of CAN log data."""
+    match = CAN_LINE_PATTERN.match(line)
     if not match:
         return None
 
-    ts_raw, rest = line.strip().split(') ')
-    timestamp = float(ts_raw[1:])
+    timestamp = float(match.group(1))
     time_str = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec='milliseconds')
     can_id = int(match.group(2), 16)
-    raw_data_hex = match.group(3)
+    raw_data_hex = match.group(3).upper()
 
-    raw_bytes = bytes.fromhex(raw_data_hex)
+    try:
+        raw_bytes = bytes.fromhex(raw_data_hex)
+    except ValueError:
+        return None
+
     if len(raw_bytes) < 4:
-        return None  # too short for valid CANaerospace frame
+        return None  # Invalid CANaerospace frame
 
     node_id = raw_bytes[0]
     data_type_code = raw_bytes[1]
@@ -218,8 +226,7 @@ def parse_line(line, raw_mode=False):
     payload = raw_bytes[4:]
 
     decoded_value, data_type = decode_data_by_type(payload, data_type_code, raw_mode)
-
-    param_name, unit = canid_info.get(can_id, ("Unknown", ""))
+    param_name, unit = CANID_INFO.get(can_id, ("Unknown", ""))
 
     return {
         "timestamp": time_str,
@@ -232,29 +239,36 @@ def parse_line(line, raw_mode=False):
         "data_type_code": f"0x{data_type_code:02X}",
         "data_type": data_type,
         "decoded_value": decoded_value,
-        "raw_data_hex": raw_data_hex.upper()
+        "raw_data_hex": raw_data_hex
     }
 
 
-def parse_log_file(input_path, output_path, filter_can_id=None, raw_mode=False):
+def parse_log_file(
+        input_path: str,
+        output_path: str,
+        filter_can_id: Optional[int] = None,
+        raw_mode: bool = False
+) -> None:
+    """Parse CAN log file and write results to CSV."""
     fieldnames = [
         "timestamp", "can_id", "can_id descr", "unit", "node_id",
         "service_code", "message_code", "data_type_code",
         "data_type", "decoded_value", "raw_data_hex"
     ]
 
-    with open(input_path, "r") as inf, open(output_path, "w", newline="") as outf:
-        writer = csv.DictWriter(outf, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
+    with open(input_path, "r") as infile, open(output_path, "w", newline="") as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
-        for line in inf:
-            parsed = parse_line(line, raw_mode=raw_mode)
-            if parsed:
-                if filter_can_id and f"0x{filter_can_id:X}" != parsed["can_id"].split()[0]:
-                    continue
+
+        filter_str = f"0x{filter_can_id:X}" if filter_can_id is not None else None
+
+        for line in infile:
+            parsed = parse_line(line, raw_mode)
+            if parsed and (filter_str is None or filter_str == parsed["can_id"].split()[0]):
                 writer.writerow(parsed)
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(description="Parse CANaerospace log to CSV")
     parser.add_argument("input_file", help="Path to log file")
     parser.add_argument("output_file", help="Path to output CSV")
@@ -263,3 +277,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     parse_log_file(args.input_file, args.output_file, args.can_id, args.raw)
+
+
+if __name__ == "__main__":
+    main()
