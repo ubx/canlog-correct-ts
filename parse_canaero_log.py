@@ -3,7 +3,7 @@ import csv
 import re
 import struct
 from datetime import datetime, timezone
-from typing import Dict, Tuple, Union, Optional, Any
+from typing import Dict, Tuple, Union, Optional, Any, List, Set
 
 # Pre-compile regex for better performance
 CAN_LINE_PATTERN = re.compile(r"\(([\d.]+)\)\s+can\d+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)")
@@ -246,7 +246,7 @@ def parse_line(line: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
 def parse_log_file(
         input_path: str,
         output_path: str,
-        filter_can_id: Optional[int] = None,
+        filter_can_ids: Optional[List[int]] = None,
         raw_mode: bool = False
 ) -> None:
     """Parse CAN log file and write results to CSV."""
@@ -260,19 +260,32 @@ def parse_log_file(
         writer = csv.DictWriter(outfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
-        filter_str = f"0x{filter_can_id:X}" if filter_can_id is not None else None
+        # Create set of filter strings for faster lookup
+        filter_set = {f"0x{can_id:X}" for can_id in filter_can_ids} if filter_can_ids else None
 
         for line in infile:
             parsed = parse_line(line, raw_mode)
-            if parsed and (filter_str is None or filter_str == parsed["can_id"].split()[0]):
-                writer.writerow(parsed)
+            if parsed:
+                if filter_set is None or parsed["can_id"].split()[0] in filter_set:
+                    writer.writerow(parsed)
+
+
+def hex_int(value: str) -> int:
+    """Convert hex string to integer."""
+    return int(value, 16)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Parse CANaerospace log to CSV")
     parser.add_argument("input_file", help="Path to log file")
     parser.add_argument("output_file", help="Path to output CSV")
-    parser.add_argument("--can-id", help="Optional CAN ID filter (hex)", type=lambda x: int(x, 16))
+    parser.add_argument(
+        "--can-id",
+        help="CAN IDs to filter (hex), e.g. --can-id 0x154 0x150 0x234",
+        type=hex_int,
+        nargs='+',  # Accept one or more arguments
+        default=None
+    )
     parser.add_argument("--raw", help="Disable decoding of data payload", action="store_true")
 
     args = parser.parse_args()
