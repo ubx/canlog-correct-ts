@@ -3,10 +3,10 @@ import csv
 import re
 import struct
 from datetime import datetime, timezone
-from typing import Dict, Tuple, Union, Optional, Any, List, Set
+from typing import Dict, Tuple, Union, Optional, Any, List
 
 # Pre-compile regex for better performance
-CAN_LINE_PATTERN = re.compile(r"\(([\d.]+)\)\s+can\d+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)")
+CAN_LINE_PATTERN = re.compile(r"\(([\d.]+)\)\s+(?:can|vcan)\d+\s+([0-9A-Fa-f]+)#([0-9A-Fa-f]+)")
 
 # Mapping of CAN ID to parameter name and unit
 CANID_INFO = {
