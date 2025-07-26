@@ -123,8 +123,8 @@ with open(inputFile) as inf:
             if ts_prev is None:
                 ts_prev = ts
             else:
-                if ts - ts_prev > 1.0:
-                    print("ERROR, gap between ts {:f} and {:f} \n".format(ts_prev, ts))
+                if ts - ts_prev > 1.1:
+                    print("ERROR, gap between ts {:f} and {:f}, {:.3f}s \n".format(ts_prev, ts, ts-ts_prev))
                 ts_prev = ts
 
             if canId == 0x1FFFFFF0:  # Time sync
