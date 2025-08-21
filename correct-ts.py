@@ -42,25 +42,30 @@ def statistics(ids, id):
     ids[id] = ids[id] + 1
 
 
-## "(1564994154.769054) can0 40C#0A032A3A1BC27A49"
-## "(1569437515.1000000) can0 141#0A0200A942E1CBEA" --> ERROR
-def check(line):
-    try:
-        if not line.startswith("("):
-            return False
-        for c in line[1:11]:
-            if not c.isdigit():
-                return False
-        if line[11] != '.':
-            return False
-        for c in line[12:18]:
-            if not c.isdigit():
-                return False
-        if line[18] != ')':
-            return False
-        return True
-    except (IndexError):
-        return False
+# ## "(1564994154.769054) can0 40C#0A032A3A1BC27A49"
+# ## "(1569437515.1000000) can0 141#0A0200A942E1CBEA" --> ERROR
+# def check(line):
+#     try:
+#         if not line.startswith("("):
+#             return False
+#         for c in line[1:11]:
+#             if not c.isdigit():
+#                 return False
+#         if line[11] != '.':
+#             return False
+#         for c in line[12:18]:
+#             if not c.isdigit():
+#                 return False
+#         if line[18] != ')':
+#             return False
+#         return True
+#     except (IndexError):
+#         return False
+import re
+
+def check(line: str) -> bool:
+    pattern = r'^\(\d+\.\d+\)\s+(?:can|vcan)\d*\s+[0-9A-Fa-f]+#[0-9A-Fa-f]+$'
+    return bool(re.match(pattern, line))
 
 def close_logfile(ts_log):
     global new_log, new_log_file_name
